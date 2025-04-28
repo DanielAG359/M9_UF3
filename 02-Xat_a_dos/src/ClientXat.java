@@ -39,12 +39,15 @@ public class ClientXat {
             System.out.print("Escriu el teu nom: ");
             String nom = scanner.nextLine();
             client.enviarMissatge(nom);
+            FilLectorCX fil = new FilLectorCX(client.in);
+            fil.start();
             String missatge = "";
             while (!missatge.equals(MSG_SORTIR)){
                 missatge = scanner.nextLine();
                 client.enviarMissatge(missatge);
             } 
             scanner.close();
+            fil.join();
             client.tancarClient();
         } catch (Exception e) {
             e.printStackTrace();

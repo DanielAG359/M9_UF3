@@ -35,6 +35,9 @@ public class ServidorXat {
             servidor.clientSocket = servidor.serverSocket.accept();
             System.out.println("Client connectat: " + servidor.clientSocket.getInetAddress());
             String nom = servidor.getNom();
+            System.out.println("Fil de xat creat.");
+            FilServidorXat fil = new FilServidorXat(nom, servidor.in);
+            fil.start();
             BufferedReader consola = new BufferedReader(new InputStreamReader(System.in));
             String missatge = "";
             while(!missatge.equals(MSG_SORTIR)){
@@ -42,6 +45,7 @@ public class ServidorXat {
                 servidor.out.writeObject(missatge);
                 servidor.out.flush();
             }
+            fil.join();
             servidor.clientSocket.close();
             servidor.pararServidor();
         } catch (Exception e) {
