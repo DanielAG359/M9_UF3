@@ -20,24 +20,27 @@ public class Client {
 
     public void rebreFitxers() throws IOException, ClassNotFoundException {
         Scanner scanner = new Scanner(System.in);
-        System.out.print("Nom del fitxer a rebre: ");
-        String ruta = scanner.nextLine();
-        if ("sortir".equalsIgnoreCase(ruta)) {
-            scanner.close();
-            return;
-        }
-        out.writeObject(ruta);
-        out.flush();
+        while (true) {
+            System.out.print("Nom del fitxer a rebre (o 'sortir' per acabar): ");
+            String ruta = scanner.nextLine();
 
-        byte[] contingut = (byte[]) in.readObject();
-        if (contingut != null) {
-            String nomFitxer = new File(ruta).getName();
-            FileOutputStream fos = new FileOutputStream(DIR_ARRIBADA + "/" + nomFitxer);
-            fos.write(contingut);
-            fos.close();
-            System.out.println("Fitxer guardat com: " + DIR_ARRIBADA + "/" + nomFitxer);
-        } else {
-            System.out.println("No s'ha rebut contingut.");
+            out.writeObject(ruta);
+            out.flush();
+
+            if ("sortir".equalsIgnoreCase(ruta)) {
+                break;
+            }
+
+            byte[] contingut = (byte[]) in.readObject();
+            if (contingut != null) {
+                String nomFitxer = new File(ruta).getName();
+                FileOutputStream fos = new FileOutputStream(DIR_ARRIBADA + "/" + nomFitxer);
+                fos.write(contingut);
+                fos.close();
+                System.out.println("Fitxer guardat com: " + DIR_ARRIBADA + "/" + nomFitxer);
+            } else {
+                System.out.println("No s'ha rebut contingut (potser el fitxer no existeix al servidor).");
+            }
         }
         scanner.close();
     }
@@ -50,7 +53,7 @@ public class Client {
         Client client = new Client();
         try {
             client.connectar();
-            client.rebreFitxers();
+            client.rebreFitxers();  // ← ahora en bucle
             client.tancarConnexio();
         } catch (Exception e) {
             e.printStackTrace();

@@ -23,30 +23,50 @@ public class Servidor {
     public void enviarFitxers(Socket socket) throws IOException, ClassNotFoundException {
         ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
         ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-
-        String nomFitxer = (String) in.readObject();
-        System.out.println("Nom fitxer rebut: " + nomFitxer);
-
-        Fitxer fitxer = new Fitxer(nomFitxer);
-        byte[] contingut = fitxer.getContingut();
-        if (contingut != null) {
-            out.writeObject(contingut);
-            out.flush();
-            System.out.println("Fitxer enviat: " + nomFitxer);
-        } else {
-            System.out.println("Error llegint el fitxer.");
-            out.writeObject(null);
+    
+        while (true) {
+            String nomFitxer = (String) in.readObject();
+    
+            if (nomFitxer == null || nomFitxer.equalsIgnoreCase("sortir")) {
+                System.out.println("Nom del fitxer buit o 'sortir'. Sortint...");
+                break;
+            }
+    
+            System.out.println("Nom fitxer rebut: " + nomFitxer);
+    
+            Fitxer fitxer = new Fitxer(nomFitxer);
+            byte[] contingut = fitxer.getContingut();
+    
+            if (contingut != null) {
+                out.writeObject(contingut);
+                out.flush();
+                System.out.println("Fitxer enviat: " + nomFitxer);
+            } else {
+                System.out.println("Error llegint el fitxer.");
+                out.writeObject(null);
+            }
         }
     }
-
+    
     public static void main(String[] args) {
         Servidor servidor = new Servidor();
         try {
-            Socket socket = servidor.connectar();
-            servidor.enviarFitxers(socket);
-            servidor.tancarConnexio(socket);
-        } catch (Exception e) {
+            servidor.serverSocket = new ServerSocket(PORT);            
+            while (true) {
+                Socket socket = servidor.serverSocket.accept();
+                try {
+                    servidor.enviarFitxers(socket);
+                } catch (Exception e) {
+                    System.err.println("Error amb el client: " + e.getMessage());
+                } finally {
+                    servidor.tancarConnexio(socket);
+                    System.out.println("Connexió tancada.");
+                }
+            }
+    
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
+    
 }
