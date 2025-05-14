@@ -5,7 +5,6 @@ import java.util.Scanner;
 public class ClientXat {
     private static final int PORT = 9999;
     private static final String HOST = "localhost";
-    private static final String MSG_SORTIR = "sortir";
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
@@ -35,22 +34,16 @@ public class ClientXat {
         try {
             ClientXat client = new ClientXat();
             client.connecta();
+
             Scanner scanner = new Scanner(System.in);
             System.out.print("Escriu el teu nom: ");
             String nom = scanner.nextLine();
             client.enviarMissatge(nom);
-            FilLectorCX fil = new FilLectorCX(client.in);
-            fil.start();
-            String missatge = "";
-            while (!missatge.equals(MSG_SORTIR)){
-                missatge = scanner.nextLine();
-                client.enviarMissatge(missatge);
-            } 
-            scanner.close();
-            fil.join();
+
             client.tancarClient();
-        } catch (Exception e) {
-            e.printStackTrace();
+            scanner.close();
+        } catch (IOException e) {
+            System.err.println("Error al client: " + e.getMessage());
         }
     }
 }

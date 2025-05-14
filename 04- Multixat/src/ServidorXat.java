@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.Hashtable;
 
 public class ServidorXat {
     private static final int PORT = 9999;
@@ -7,6 +8,7 @@ public class ServidorXat {
     private static final String MSG_SORTIR = "sortir";
     private ServerSocket serverSocket;
     private boolean sortir = false;
+    private Hashtable<String, GestorClients> clients = new Hashtable<>();
 
     public void servidorAEscoltar() {
         try {
@@ -16,8 +18,9 @@ public class ServidorXat {
             while (!sortir) {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("Client connectat: " + clientSocket.getInetAddress());
-                // De moment no fem res més amb aquest socket
-                clientSocket.close(); // Només el tanquem per no deixar-lo obert
+
+                GestorClients gestor = new GestorClients(clientSocket, this);
+                gestor.start();
             }
 
         } catch (IOException e) {
@@ -35,6 +38,11 @@ public class ServidorXat {
         } catch (IOException e) {
             System.err.println("Error tancant el servidor: " + e.getMessage());
         }
+    }
+
+    public void afegirClient(GestorClients client) {
+        clients.put(client.getNom(), client);
+        System.out.println("DEBUG: multicast Entra: " + client.getNom());
     }
 
     public static void main(String[] args) {
