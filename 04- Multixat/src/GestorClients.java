@@ -36,19 +36,20 @@ public class GestorClients extends Thread {
     @Override
     public void run() {
         try {
-            Object input;
-            while (!sortir && (input = in.readObject()) != null) {
-                String missatge = input.toString();
+            while (!sortir) {
+                String missatge = (String) in.readObject();
                 processaMissatge(missatge);
             }
         } catch (Exception e) {
-            System.err.println("Error amb client " + nom + ". Tancant connexió.");
+            System.out.println("Error en client " + nom);
         } finally {
             try {
                 client.close();
             } catch (IOException e) {}
+            System.out.println("Client " + nom + " desconnectat.");
         }
     }
+
     public void processaMissatge(String missatge) {
         String codi = Missatge.getCodiMissatge(missatge);
         String[] parts = Missatge.getPartsMissatge(missatge);
@@ -72,6 +73,15 @@ public class GestorClients extends Thread {
                 servidor.enviarMissatgeGrup(nom + ": " + missatgeGrup);
                 break;
 
+            case Missatge.CODI_SORTIR_CLIENT:
+                sortir = true;
+                servidor.eliminarClient(nom);
+                break;
+
+            case Missatge.CODI_SORTIR_TOTS:
+                sortir = true;
+                servidor.finalitzarXat();
+                break;
             default:
                 System.out.println("Codi no reconegut: " + missatge);
         }
