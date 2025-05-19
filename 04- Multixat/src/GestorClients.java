@@ -16,7 +16,7 @@ public class GestorClients extends Thread {
             this.out = new ObjectOutputStream(client.getOutputStream());
             this.in = new ObjectInputStream(client.getInputStream());
         } catch (IOException e) {
-            System.err.println("Error creant fluxos del client.");
+            e.printStackTrace();
         }
     }
 
@@ -46,11 +46,13 @@ public class GestorClients extends Thread {
             try {
                 client.close();
             } catch (IOException e) {}
-            System.out.println("Client " + nom + " desconnectat.");
+            servidor.eliminarClient(nom);
         }
     }
 
-    public void processaMissatge(String missatge) {
+
+
+    public void processaMissatge(String missatge) throws IOException {
         String codi = Missatge.getCodiMissatge(missatge);
         String[] parts = Missatge.getPartsMissatge(missatge);
 
@@ -82,6 +84,7 @@ public class GestorClients extends Thread {
                 sortir = true;
                 servidor.finalitzarXat();
                 break;
+                
             default:
                 System.out.println("Codi no reconegut: " + missatge);
         }

@@ -1,14 +1,13 @@
 import java.io.*;
 import java.net.*;
-import java.util.*;
+import java.util.Hashtable;
 
 public class ServidorXat {
     private static final int PORT = 9999;
     private static final String HOST = "localhost";
-    private static final String MSG_SORTIR = "sortir";
-    ServerSocket serverSocket;
+    private ServerSocket serverSocket;
     private Hashtable<String, GestorClients> clients = new Hashtable<>();
-    boolean sortir = false;
+    private boolean sortir = false;
 
     public void servidorAEscoltar() throws IOException {
         serverSocket = new ServerSocket(PORT);
@@ -16,61 +15,62 @@ public class ServidorXat {
     }
 
     public void pararServidor() throws IOException {
-        if (serverSocket != null && !serverSocket.isClosed()) {
-            serverSocket.close();
-            System.out.println("Servidor aturat.");
-        }
+        serverSocket.close();
+        System.out.println("Servidor aturat.");
+    }
+    
+    public void afegirClient(GestorClients gc) throws IOException {
+        clients.put(gc.getNom(), gc);
+        enviarMissatgeGrup("DEBUG: multicast Entra: " + gc.getNom());
     }
 
-    public synchronized void afegirClient(GestorClients client) {
-        clients.put(client.getNom(), client);
-        enviarMissatgeGrup(Missatge.getMissatgeGrup("Entra: " + client.getNom()));
-    }
-
-    public synchronized void eliminarClient(String nom) {
+    public void eliminarClient(String nom) {
         if (clients.containsKey(nom)) {
             clients.remove(nom);
-            enviarMissatgeGrup(Missatge.getMissatgeGrup(nom + " ha sortit."));
+            System.out.println("Client eliminat: " + nom);
         }
     }
 
-    public synchronized void enviarMissatgeGrup(String missatge) {
-        for (GestorClients gc : clients.values()) {
-            gc.enviarMissatge("Servidor", missatge);
+    public void enviarMissatgePersonal(String destinatari, String remitent, String missatge) throws IOException {
+        GestorClients gc = clients.get(destinatari);
+        if (gc != null) {
+            gc.enviarMissatge(remitent, missatge);
+        } else {
+            System.out.println("WARNING: client destinatari \"" + destinatari + "\" no trobat.");
         }
     }
 
-    public synchronized void enviarMissatgePersonal(String desti, String remitent, String missatge) {
-        GestorClients receptor = clients.get(desti);
-        if (receptor != null) {
-            receptor.enviarMissatge(remitent, missatge);
+    public void enviarMissatgeGrup(String missatge) throws IOException {
+        for (GestorClients client : clients.values()) {
+            client.enviarMissatge(client.getNom(), missatge);
         }
     }
-
-    public synchronized void finalitzarXat() {
-        enviarMissatgeGrup(Missatge.getMissatgeSortirTots("Adéu"));
+    public void finalitzarXat() throws IOException {
+        enviarMissatgeGrup("Tancant tots els clients.");
         clients.clear();
         sortir = true;
-        try {
-            pararServidor();
-        } catch (IOException e) {
-            e.printStackTrace();
+    }
+    public void gestionarClients() {
+        while (!sortir) {
+            try {
+                Socket clientSocket = serverSocket.accept();
+                System.out.println("Client connectat: " + clientSocket.getInetAddress());
+                GestorClients gc = new GestorClients(clientSocket, this);
+                gc.start();
+                afegirClient(gc);
+            } catch (IOException e) {
+                System.out.println("Error al connectar el client.");
+            }
         }
-        System.out.println("Tancant tots els clients.");
     }
 
     public static void main(String[] args) {
         ServidorXat servidor = new ServidorXat();
         try {
             servidor.servidorAEscoltar();
-            while (!servidor.sortir) {
-                Socket clientSocket = servidor.serverSocket.accept();
-                System.out.println("Client connectat: " + clientSocket.getInetAddress());
-                GestorClients gc = new GestorClients(clientSocket, servidor);
-                gc.start();
-            }
+            servidor.gestionarClients();
         } catch (IOException e) {
-            System.out.println("Servidor finalitzat.");
+            e.printStackTrace();
         } finally {
             try {
                 servidor.pararServidor();
