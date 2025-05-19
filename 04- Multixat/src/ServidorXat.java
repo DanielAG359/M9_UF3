@@ -49,4 +49,20 @@ public class ServidorXat {
         ServidorXat servidor = new ServidorXat();
         servidor.servidorAEscoltar();
     }
+
+    public void enviarMissatgeGrup(String missatge) {
+        for (GestorClients client : clients.values()) {
+            client.enviarMissatge("Servidor", missatge);
+        }
+    }
+
+    public void enviarMissatgePersonal(String destinatari, String remitent, String missatge) {
+        GestorClients client = clients.get(destinatari);
+        if (client != null) {
+            client.enviarMissatge(remitent, missatge);
+            System.out.println("Missatge personal per (" + destinatari + ") de (" + remitent + "): " + missatge);
+        } else {
+            System.out.println("Usuari " + destinatari + " no trobat.");
+        }
+    }
 }

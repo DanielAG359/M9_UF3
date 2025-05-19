@@ -49,16 +49,29 @@ public class GestorClients extends Thread {
             } catch (IOException e) {}
         }
     }
-
     public void processaMissatge(String missatge) {
         String codi = Missatge.getCodiMissatge(missatge);
         String[] parts = Missatge.getPartsMissatge(missatge);
+
+        if (codi == null || parts == null) return;
 
         switch (codi) {
             case Missatge.CODI_CONECTAR:
                 nom = parts[1];
                 servidor.afegirClient(this);
                 break;
+
+            case Missatge.CODI_MSG_PERSONAL:
+                String destinatari = parts[1];
+                String msg = parts[2];
+                servidor.enviarMissatgePersonal(destinatari, nom, msg);
+                break;
+
+            case Missatge.CODI_MSG_GRUP:
+                String missatgeGrup = parts[1];
+                servidor.enviarMissatgeGrup(nom + ": " + missatgeGrup);
+                break;
+
             default:
                 System.out.println("Codi no reconegut: " + missatge);
         }
