@@ -16,7 +16,7 @@ public class GestorClients extends Thread {
             this.out = new ObjectOutputStream(client.getOutputStream());
             this.in = new ObjectInputStream(client.getInputStream());
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Error creant fluxos");
         }
     }
 
@@ -24,13 +24,17 @@ public class GestorClients extends Thread {
         return nom;
     }
 
-    public void enviarMissatge(String remitent, String missatge) {
+    public void enviarMissatgeFormatat(String missatge) {
         try {
-            out.writeObject("Missatge de (" + remitent + "): " + missatge);
+            out.writeObject(missatge);
             out.flush();
         } catch (IOException e) {
             System.err.println("Error enviant missatge a " + nom);
         }
+    }
+
+    public void enviarMissatge(String remitent, String missatge) {
+        // No usado directamente, enviamos mensajes ya formateados con códigos
     }
 
     @Override
@@ -38,41 +42,35 @@ public class GestorClients extends Thread {
         try {
             while (!sortir) {
                 String missatge = (String) in.readObject();
+                if (missatge == null) break;
                 processaMissatge(missatge);
             }
-        } catch (Exception e) {
-            System.out.println("Error en client " + nom);
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println("Error rebent missatge de " + nom + ". Sortint...");
         } finally {
+            sortir = true;
+            servidor.eliminarClient(nom);
             try {
                 client.close();
-            } catch (IOException e) {}
-            servidor.eliminarClient(nom);
+            } catch (IOException e) {
+            }
+            System.out.println("Client " + nom + " desconnectat.");
         }
     }
-
-
 
     public void processaMissatge(String missatge) throws IOException {
         String codi = Missatge.getCodiMissatge(missatge);
         String[] parts = Missatge.getPartsMissatge(missatge);
 
-        if (codi == null || parts == null) return;
+        if (codi == null || parts == null) {
+            System.out.println("Missatge incorrecte rebut: " + missatge);
+            return;
+        }
 
         switch (codi) {
             case Missatge.CODI_CONECTAR:
                 nom = parts[1];
                 servidor.afegirClient(this);
-                break;
-
-            case Missatge.CODI_MSG_PERSONAL:
-                String destinatari = parts[1];
-                String msg = parts[2];
-                servidor.enviarMissatgePersonal(destinatari, nom, msg);
-                break;
-
-            case Missatge.CODI_MSG_GRUP:
-                String missatgeGrup = parts[1];
-                servidor.enviarMissatgeGrup(nom + ": " + missatgeGrup);
                 break;
 
             case Missatge.CODI_SORTIR_CLIENT:
@@ -84,7 +82,24 @@ public class GestorClients extends Thread {
                 sortir = true;
                 servidor.finalitzarXat();
                 break;
-                
+
+            case Missatge.CODI_MSG_PERSONAL:
+                if (parts.length >= 3) {
+                    String destinatari = parts[1];
+                    String msg = parts[2];
+                    servidor.enviarMissatgePersonal(destinatari, nom, msg);
+                } else {
+                    System.out.println("Missatge personal incorrecte: " + missatge);
+                }
+                break;
+
+            case Missatge.CODI_MSG_GRUP:
+                if (parts.length >= 2) {
+                    String msgGrup = parts[1];
+                    servidor.enviarMissatgeGrup(nom + ": " + msgGrup);
+                }
+                break;
+
             default:
                 System.out.println("Codi no reconegut: " + missatge);
         }
