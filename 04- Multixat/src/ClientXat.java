@@ -2,29 +2,23 @@ import java.io.*;
 import java.net.*;
 import java.util.Scanner;
 
-public class ClientXat {
-    private static final int PORT = 9999;
-    private static final String HOST = "localhost";
-    private static final String MSG_SORTIR = "sortir";
+public class ClientXat extends Thread {
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
     private boolean sortir = false;
 
     public void connecta() throws IOException {
-        socket = new Socket(HOST, PORT);
-        System.out.println("Client connectat a " + HOST + ":" + PORT);
+        socket = new Socket("localhost", 9999);
         out = new ObjectOutputStream(socket.getOutputStream());
-        out.flush();
-        System.out.println("Flux de sortida creat.");
+        System.out.println("Client connectat a localhost:9999");
+        System.out.println("Flux d'entrada i sortida creat.");
     }
 
     public void enviarMissatge(String missatge) throws IOException {
-        if (out != null) {
-            out.writeObject(missatge);
-            out.flush();
-            System.out.println("Enviant missatge: " + missatge);
-        }
+        out.writeObject(missatge);
+        out.flush();
+        System.out.println("Enviant missatge: " + missatge);
     }
 
     public void tancarClient() {
@@ -33,56 +27,64 @@ public class ClientXat {
             if (out != null) out.close();
             if (socket != null) socket.close();
         } catch (IOException e) {
-            System.out.println("Error tancant client: " + e.getMessage());
         }
-        System.out.println("Client tancat.");
+        System.out.println("Tancant client...");
+    }
+
+    @Override
+    public void run() {
+        try {
+            in = new ObjectInputStream(socket.getInputStream());
+            System.out.println("DEBUG: Iniciant rebuda de missatges...");
+            while (!sortir) {
+                String missatgeCru = (String) in.readObject();
+                if (missatgeCru == null) break;
+
+                String codi = Missatge.getCodiMissatge(missatgeCru);
+                String[] parts = Missatge.getPartsMissatge(missatgeCru);
+
+                if (codi == null || parts == null) {
+                    System.out.println("Missatge rebut incorrecte.");
+                    continue;
+                }
+
+                switch (codi) {
+                    case Missatge.CODI_SORTIR_TOTS:
+                        sortir = true;
+                        System.out.println("Tancant per ordre del servidor...");
+                        break;
+
+                    case Missatge.CODI_MSG_PERSONAL:
+                        if (parts.length >= 3) {
+                            String remitent = parts[1];
+                            String msg = parts[2];
+                            System.out.println("Missatge de (" + remitent + "): " + msg);
+                        }
+                        break;
+
+                    case Missatge.CODI_MSG_GRUP:
+                        if (parts.length >= 2) {
+                            String msgGrup = parts[1];
+                            System.out.println("Missatge de grup: " + msgGrup);
+                        }
+                        break;
+
+                    default:
+                        System.out.println("Missatge desconegut: " + missatgeCru);
+                }
+            }
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println("Error rebent missatge. Sortint...");
+        } finally {
+            sortir = true;
+            tancarClient();
+        }
     }
 
     public void ajuda() {
         System.out.println("---------------------");
         System.out.println("Comandes disponibles:");
-        System.out.println("1.- Conectar al servidor (primer pass obligatori)");
-        System.out.println("2.- Enviar missatge personal");
-        System.out.println("3.- Enviar missatge al grup");
-        System.out.println("4.- (o línia en blanc)-> Sortir del client");
-        System.out.println("5.- Finalitzar tothom");
-        System.out.println("---------------------");
-    }
-
-    public void rebreMissatges() {
-        try {
-            in = new ObjectInputStream(socket.getInputStream());
-            System.out.println("Flux d'entrada creat.");
-            while (!sortir) {
-                String missatgeCru = (String) in.readObject();
-                String codi = Missatge.getCodiMissatge(missatgeCru);
-                String[] parts = Missatge.getPartsMissatge(missatgeCru);
-
-                if (codi == null || parts == null) continue;
-
-                switch (codi) {
-                    case Missatge.CODI_SORTIR_TOTS:
-                        sortir = true;
-                        break;
-                    case Missatge.CODI_MSG_PERSONAL:
-                        System.out.println("Missatge de (" + parts[1] + "): " + parts[2]);
-                        break;
-                    case Missatge.CODI_MSG_GRUP:
-                        System.out.println("Missatge grupal: " + parts[1]);
-                        break;
-                    default:
-                        System.out.println("Error: codi desconegut.");
-                }
-            }
-        } catch (Exception e) {
-            System.out.println("Error rebent missatge. Sortint...");
-        }
-    }
-
-    public void mostraAjuda() {
-        System.out.println("---------------------");
-        System.out.println("Comandes disponibles:");
-        System.out.println("1.- Conectar al servidor (primer pass obligatori)");
+        System.out.println("1.- Conectar al servidor (primer pas obligatori)");
         System.out.println("2.- Enviar missatge personal");
         System.out.println("3.- Enviar missatge al grup");
         System.out.println("4.- (o línia en blanc)-> Sortir del client");
@@ -91,99 +93,95 @@ public class ClientXat {
     }
 
     public String getLinea(Scanner scanner, String missatge, boolean obligatori) {
-        String input = null;
+        String input = "";
         do {
             System.out.print(missatge);
-            input = scanner.nextLine();
-        } while (obligatori && (input == null || input.trim().isEmpty()));
+            input = scanner.nextLine().trim();
+        } while (obligatori && (input == null || input.isEmpty()));
         return input;
     }
 
     public static void main(String[] args) {
         ClientXat client = new ClientXat();
         Scanner sc = new Scanner(System.in);
+        boolean sortir = false;
+        boolean connectat = false;
 
         try {
             client.connecta();
-            client.in = new ObjectInputStream(client.socket.getInputStream());
-            System.out.println("Flux d'entrada creat.");
-            Thread lectura = new Thread(() -> {
-                try {
-                    System.out.println("DEBUG: Iniciant rebuda de missatges...");
-                    while (!client.sortir) {
-                        String missatgeCru = (String) client.in.readObject();
-                        String codi = Missatge.getCodiMissatge(missatgeCru);
-                        String[] parts = Missatge.getPartsMissatge(missatgeCru);
-
-                        if (codi == null || parts == null) continue;
-
-                        switch (codi) {
-                            case Missatge.CODI_SORTIR_TOTS:
-                                client.sortir = true;
-                                break;
-                            case Missatge.CODI_MSG_PERSONAL:
-                                System.out.println("Missatge de (" + parts[1] + "): " + parts[2]);
-                                break;
-                            case Missatge.CODI_MSG_GRUP:
-                                System.out.println("[GRUP]: " + parts[1]);
-                                break;
-                            default:
-                                System.out.println("Error: codi desconegut.");
-                        }
-                    }
-                } catch (Exception e) {
-                    System.out.println("Error rebent missatge. Sortint...");
-                }
-            });
-
-            lectura.start();
-
+            client.start();
             client.ajuda();
 
-            while (!client.sortir) {
-                String opcio = client.getLinea(sc, "Opció: ", false);
-                if (opcio.isEmpty()) {
-                    client.sortir = true;
-                    client.enviarMissatge(Missatge.getMissatgeSortirClient("Adéu"));
-                    break;
+            while (!sortir) {
+                String linea = client.getLinea(sc, "", false);
+                if (linea.isEmpty()) linea = "4";
+                switch (linea) {
+                    case "1":
+                        if (!connectat) {
+                            String nom = client.getLinea(sc, "Introdueix el nom: ", true);
+                            String missatgeConectar = Missatge.getMissatgeConectar(nom);
+                            client.enviarMissatge(missatgeConectar);
+                            connectat = true;
+                        } else {
+                            System.out.println("Ja estàs connectat.");
+                        }
+                        break;
+
+                    case "2":
+                        if (!connectat) {
+                            System.out.println("Primer connecta al servidor (opció 1).");
+                            break;
+                        }
+                        String destinatari = client.getLinea(sc, "Destinatari:: ", true);
+                        String msgPersonal = client.getLinea(sc, "Missatge a enviar: ", true);
+                        String missatgePersonal = Missatge.getMissatgePersonal(destinatari, msgPersonal);
+                        client.enviarMissatge(missatgePersonal);
+                        break;
+
+                    case "3":
+                        if (!connectat) {
+                            System.out.println("Primer connecta al servidor (opció 1).");
+                            break;
+                        }
+                        String msgGrup = client.getLinea(sc, "Missatge a enviar al grup: ", true);
+                        String missatgeGrup = Missatge.getMissatgeGrup(msgGrup);
+                        client.enviarMissatge(missatgeGrup);
+                        break;
+
+                    case "4":
+                        if (!connectat) {
+                            sortir = true;
+                        } else {
+                            String missatgeSortirClient = Missatge.getMissatgeSortirClient("Adéu");
+                            client.enviarMissatge(missatgeSortirClient);
+                            sortir = true;
+                        }
+                        break;
+
+                    case "5":
+                        if (!connectat) {
+                            sortir = true;
+                        } else {
+                            String missatgeSortirTots = Missatge.getMissatgeSortirTots("Adéu");
+                            client.enviarMissatge(missatgeSortirTots);
+                            sortir = true;
+                        }
+                        break;
+
+                    default:
+                        System.out.println("Comanda no reconeguda.");
                 }
 
-                switch (opcio) {
-                    case "1":
-                        String nom = client.getLinea(sc, "Introdueix el nom: ", true);
-                        client.enviarMissatge(Missatge.getMissatgeConectar(nom));
-                        break;
-                    case "2":
-                        String dest = client.getLinea(sc, "Destinatari:: ", true);
-                        String msgP = client.getLinea(sc, "Missatge a enviar: ", true);
-                        client.enviarMissatge(Missatge.getMissatgePersonal(dest, msgP));
-                        break;
-                    case "3":
-                        String msgG = client.getLinea(sc, "Missatge per al grup: ", true);
-                        client.enviarMissatge(Missatge.getMissatgeGrup(msgG));
-                        break;
-                    case "4":
-                        client.sortir = true;
-                        client.enviarMissatge(Missatge.getMissatgeSortirClient("Adéu"));
-                        break;
-                    case "5":
-                        client.sortir = true;
-                        client.enviarMissatge(Missatge.getMissatgeSortirTots("Adéu"));
-                        break;
-                    default:
-                        System.out.println("Opció no vàlida.");
-                        client.ajuda();
+                if (!sortir) {
+                    client.ajuda();
                 }
             }
-
-            lectura.join();
-            client.tancarClient();
-
-        } catch (Exception e) {
-            System.out.println("Error: " + e.getMessage());
+        } catch (IOException e) {
+            System.out.println("Error de connexió: " + e.getMessage());
         } finally {
+            client.sortir = true;
+            client.tancarClient();
             sc.close();
         }
     }
-
 }
