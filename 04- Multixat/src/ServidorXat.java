@@ -1,5 +1,6 @@
-import java.io.*;
-import java.net.*;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Hashtable;
 
 public class ServidorXat {
@@ -23,55 +24,64 @@ public class ServidorXat {
         }
     }
 
-    public void finalitzarXat() throws IOException {
-        enviarMissatgeGrup(MSG_SORTIR);
-        clients.clear();
-        sortir = true;
-        System.out.println("Tancant tots els clients.");
+    public synchronized void finalitzarXat() {
+        try {
+            String msg = Missatge.getMissatgeSortirTots(MSG_SORTIR);
+            for (GestorClients gc : clients.values()) {
+                gc.enviarMissatgeFormatat(msg);
+            }
+            clients.clear();
+            sortir = true;
+            System.out.println("Tancant tots els clients.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
-    public void afegirClient(GestorClients gc) throws IOException {
+    public synchronized void afegirClient(GestorClients gc) throws IOException {
         clients.put(gc.getNom(), gc);
-        enviarMissatgeGrup("DEBUG: multicast Entra: " + gc.getNom());
+        String entrada = "Entra: " + gc.getNom();
+        String msg = Missatge.getMissatgeGrup(entrada);
+        for (GestorClients c : clients.values()) {
+            c.enviarMissatgeFormatat(msg);
+        }
         System.out.println(gc.getNom() + " connectat.");
     }
 
-    public void eliminarClient(String nom) {
+    public synchronized void eliminarClient(String nom) {
         if (nom != null && clients.containsKey(nom)) {
             clients.remove(nom);
             System.out.println("Client eliminat: " + nom);
         }
     }
 
-    public void enviarMissatgeGrup(String missatge) throws IOException {
-        String msgFormatat = Missatge.getMissatgeGrup(missatge);
+    public synchronized void enviarMissatgeGrup(String text) throws IOException {
+        String msg = Missatge.getMissatgeGrup(text);
         for (GestorClients gc : clients.values()) {
-            gc.enviarMissatgeFormatat(msgFormatat);
+            gc.enviarMissatgeFormatat(msg);
         }
     }
 
-    public void enviarMissatgePersonal(String destinatari, String remitent, String missatge) throws IOException {
-        GestorClients gc = clients.get(destinatari);
+    public synchronized void enviarMissatgePersonal(String dest, String remet, String text) throws IOException {
+        GestorClients gc = clients.get(dest);
         if (gc != null) {
-            String msgFormatat = Missatge.getMissatgePersonal(remitent, missatge);
-            gc.enviarMissatgeFormatat(msgFormatat);
-            System.out.println("Missatge personal per (" + destinatari + ") de (" + remitent + "): " + missatge);
+            String msg = Missatge.getMissatgePersonal(remet, text);
+            gc.enviarMissatgeFormatat(msg);
+            System.out.println("Missatge personal per (" + dest + ") de (" + remet + "): " + text);
         } else {
-            System.out.println("Client destinatari (" + destinatari + ") no trobat.");
+            System.out.println("Client destinatari (" + dest + ") no trobat.");
         }
     }
 
     public void gestionarClients() {
         while (!sortir) {
             try {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("Client connectat: " + clientSocket.getInetAddress());
-                GestorClients gc = new GestorClients(clientSocket, this);
+                Socket sock = serverSocket.accept();
+                System.out.println("Client connectat: " + sock.getInetAddress());
+                GestorClients gc = new GestorClients(sock, this);
                 gc.start();
             } catch (IOException e) {
-                if (!sortir) {
-                    System.err.println("Error acceptant client: " + e.getMessage());
-                }
+                if (!sortir) System.err.println("Error acceptant client: " + e.getMessage());
             }
         }
     }
@@ -86,8 +96,8 @@ public class ServidorXat {
         } finally {
             try {
                 servidor.pararServidor();
-            } catch (IOException e) {
-                e.printStackTrace();
+            } catch (IOException ex) {
+                ex.printStackTrace();
             }
         }
     }

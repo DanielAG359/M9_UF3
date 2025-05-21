@@ -13,8 +13,8 @@ public class GestorClients extends Thread {
         this.client = client;
         this.servidor = servidor;
         try {
-            this.out = new ObjectOutputStream(client.getOutputStream());
-            this.in = new ObjectInputStream(client.getInputStream());
+            out = new ObjectOutputStream(client.getOutputStream());
+            in  = new ObjectInputStream(client.getInputStream());
         } catch (IOException e) {
             System.err.println("Error creant fluxos");
         }
@@ -24,53 +24,46 @@ public class GestorClients extends Thread {
         return nom;
     }
 
-    public void enviarMissatgeFormatat(String missatge) {
-        try {
-            out.writeObject(missatge);
-            out.flush();
-        } catch (IOException e) {
-            System.err.println("Error enviant missatge a " + nom);
-        }
-    }
-
-    public void enviarMissatge(String remitent, String missatge) {
-        // No usado directamente, enviamos mensajes ya formateados con códigos
+    public void enviarMissatgeFormatat(String msg) throws IOException {
+        out.writeObject(msg);
+        out.flush();
     }
 
     @Override
     public void run() {
         try {
             while (!sortir) {
-                String missatge = (String) in.readObject();
-                if (missatge == null) break;
-                processaMissatge(missatge);
+                String raw = (String) in.readObject();
+                if (raw == null) break;
+                processaMissatge(raw);
             }
         } catch (IOException | ClassNotFoundException e) {
             System.out.println("Error rebent missatge de " + nom + ". Sortint...");
         } finally {
             sortir = true;
             servidor.eliminarClient(nom);
-            try {
-                client.close();
-            } catch (IOException e) {
-            }
+            try { client.close(); } catch (IOException e){}
             System.out.println("Client " + nom + " desconnectat.");
         }
     }
 
-    public void processaMissatge(String missatge) throws IOException {
-        String codi = Missatge.getCodiMissatge(missatge);
-        String[] parts = Missatge.getPartsMissatge(missatge);
-
-        if (codi == null || parts == null) {
-            System.out.println("Missatge incorrecte rebut: " + missatge);
-            return;
-        }
+    private void processaMissatge(String raw) throws IOException {
+        String codi = Missatge.getCodiMissatge(raw);
+        String[] parts = Missatge.getPartsMissatge(raw);
+        if (codi == null || parts == null) return;
 
         switch (codi) {
             case Missatge.CODI_CONECTAR:
                 nom = parts[1];
                 servidor.afegirClient(this);
+                break;
+
+            case Missatge.CODI_MSG_PERSONAL:
+                servidor.enviarMissatgePersonal(parts[1], nom, parts[2]);
+                break;
+
+            case Missatge.CODI_MSG_GRUP:
+                servidor.enviarMissatgeGrup(nom + ": " + parts[1]);
                 break;
 
             case Missatge.CODI_SORTIR_CLIENT:
@@ -83,25 +76,8 @@ public class GestorClients extends Thread {
                 servidor.finalitzarXat();
                 break;
 
-            case Missatge.CODI_MSG_PERSONAL:
-                if (parts.length >= 3) {
-                    String destinatari = parts[1];
-                    String msg = parts[2];
-                    servidor.enviarMissatgePersonal(destinatari, nom, msg);
-                } else {
-                    System.out.println("Missatge personal incorrecte: " + missatge);
-                }
-                break;
-
-            case Missatge.CODI_MSG_GRUP:
-                if (parts.length >= 2) {
-                    String msgGrup = parts[1];
-                    servidor.enviarMissatgeGrup(nom + ": " + msgGrup);
-                }
-                break;
-
             default:
-                System.out.println("Codi no reconegut: " + missatge);
+                System.out.println("Codi no reconegut: " + raw);
         }
     }
 }

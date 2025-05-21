@@ -22,14 +22,35 @@ public class ClientXat extends Thread {
     }
 
     public void tancarClient() {
-        try {
-            if (in != null) in.close();
-            if (out != null) out.close();
-            if (socket != null) socket.close();
-        } catch (IOException e) {
-        }
         System.out.println("Tancant client...");
+        try {
+            if (in != null) {
+                in.close();
+                System.out.println("Flux d'entrada tancat.");
+            }
+        } catch (IOException e) {
+            System.err.println("Error tancant flux d'entrada: " + e.getMessage());
+        }
+
+        try {
+            if (out != null) {
+                out.close();
+                System.out.println("Flux de sortida tancat.");
+            }
+        } catch (IOException e) {
+            System.err.println("Error tancant flux de sortida: " + e.getMessage());
+        }
+
+        try {
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+                System.out.println("Socket tancat.");
+            }
+        } catch (IOException e) {
+            System.err.println("Error tancant socket: " + e.getMessage());
+        }
     }
+
 
     @Override
     public void run() {
@@ -103,7 +124,7 @@ public class ClientXat extends Thread {
 
     public static void main(String[] args) {
         ClientXat client = new ClientXat();
-        Scanner sc = new Scanner(System.in);
+        Scanner scanner = new Scanner(System.in);
         boolean sortir = false;
         boolean connectat = false;
 
@@ -113,12 +134,13 @@ public class ClientXat extends Thread {
             client.ajuda();
 
             while (!sortir) {
-                String linea = client.getLinea(sc, "", false);
+                String linea = client.getLinea(scanner, "", false);
                 if (linea.isEmpty()) linea = "4";
+
                 switch (linea) {
                     case "1":
                         if (!connectat) {
-                            String nom = client.getLinea(sc, "Introdueix el nom: ", true);
+                            String nom = client.getLinea(scanner, "Introdueix el nom: ", true);
                             String missatgeConectar = Missatge.getMissatgeConectar(nom);
                             client.enviarMissatge(missatgeConectar);
                             connectat = true;
@@ -132,8 +154,8 @@ public class ClientXat extends Thread {
                             System.out.println("Primer connecta al servidor (opció 1).");
                             break;
                         }
-                        String destinatari = client.getLinea(sc, "Destinatari:: ", true);
-                        String msgPersonal = client.getLinea(sc, "Missatge a enviar: ", true);
+                        String destinatari = client.getLinea(scanner, "Destinatari:: ", true);
+                        String msgPersonal = client.getLinea(scanner, "Missatge a enviar: ", true);
                         String missatgePersonal = Missatge.getMissatgePersonal(destinatari, msgPersonal);
                         client.enviarMissatge(missatgePersonal);
                         break;
@@ -143,7 +165,7 @@ public class ClientXat extends Thread {
                             System.out.println("Primer connecta al servidor (opció 1).");
                             break;
                         }
-                        String msgGrup = client.getLinea(sc, "Missatge a enviar al grup: ", true);
+                        String msgGrup = client.getLinea(scanner, "Missatge a enviar al grup: ", true);
                         String missatgeGrup = Missatge.getMissatgeGrup(msgGrup);
                         client.enviarMissatge(missatgeGrup);
                         break;
@@ -181,7 +203,7 @@ public class ClientXat extends Thread {
         } finally {
             client.sortir = true;
             client.tancarClient();
-            sc.close();
+            scanner.close();
         }
     }
 }
